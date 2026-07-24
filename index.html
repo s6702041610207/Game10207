@@ -341,14 +341,31 @@
         // ============================================================
         // --- Google Sheets Auth & Cloud Save ---
         // ============================================================
-        // Helper: POST to Apps Script (avoids GET redirect CORS issues)
+        // Helper: POST to Apps Script.
+        // IMPORTANT: We intentionally send Content-Type: text/plain instead of
+        // application/json. Google Apps Script Web Apps do NOT respond to CORS
+        // preflight (OPTIONS) requests. If the browser sees 'application/json'
+        // it will send a preflight OPTIONS request first, which Apps Script
+        // cannot answer -> the whole request fails with a CORS/network error
+        // before it ever reaches doPost. 'text/plain' is a "simple request"
+        // and skips the preflight entirely. Apps Script still receives the
+        // raw JSON string in e.postData.contents regardless of the header,
+        // so JSON.parse(e.postData.contents) on the server works fine.
         async function callAPI(payload) {
-            const res = await fetch(APP_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            return res.json();
+            try {
+                const res = await fetch(APP_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+                return await res.json();
+            } catch (err) {
+                console.error('callAPI failed:', err);
+                throw err;
+            }
         }
 
         async function handleAuth(action) {
@@ -389,7 +406,7 @@
                 }
             } catch(e) {
                 statusEl.style.color = '#e74c3c';
-                statusEl.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้';
+                statusEl.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้ (' + (e && e.message ? e.message : 'unknown error') + ')';
                 console.error(e);
             }
         }
