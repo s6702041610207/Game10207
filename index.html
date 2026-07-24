@@ -341,23 +341,22 @@
         // ============================================================
         // --- Google Sheets Auth & Cloud Save ---
         // ============================================================
-        // Helper: POST to Apps Script.
-        // IMPORTANT: We intentionally send Content-Type: text/plain instead of
-        // application/json. Google Apps Script Web Apps do NOT respond to CORS
-        // preflight (OPTIONS) requests. If the browser sees 'application/json'
-        // it will send a preflight OPTIONS request first, which Apps Script
-        // cannot answer -> the whole request fails with a CORS/network error
-        // before it ever reaches doPost. 'text/plain' is a "simple request"
-        // and skips the preflight entirely. Apps Script still receives the
-        // raw JSON string in e.postData.contents regardless of the header,
-        // so JSON.parse(e.postData.contents) on the server works fine.
+        // Helper: GET request to Apps Script.
+        // IMPORTANT: The Apps Script backend only implements doGet(e), which
+        // reads e.parameter (query string values). It has no doPost(e).
+        // Sending a POST with a JSON body therefore never gets handled and
+        // fails (shows up as "Failed to fetch" / CORS error in the browser).
+        // Using a plain GET with the payload encoded as query parameters:
+        //   1) matches what the backend actually expects (e.parameter), and
+        //   2) is a CORS "simple request" with no custom headers, so the
+        //      browser never sends a preflight OPTIONS request at all.
         async function callAPI(payload) {
             try {
-                const res = await fetch(APP_SCRIPT_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(payload)
+                const url = new URL(APP_SCRIPT_URL);
+                Object.keys(payload).forEach(key => {
+                    url.searchParams.set(key, payload[key]);
                 });
+                const res = await fetch(url.toString(), { method: 'GET' });
                 if (!res.ok) {
                     throw new Error('HTTP ' + res.status);
                 }
