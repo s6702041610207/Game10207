@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Farm Island 3D</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Kanit', sans-serif; 
+            user-select: none; 
+            background: #87CEEB; /* fallback sky blue */
+        }
+        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        
+        /* UI Layers */
+        #ui-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; pointer-events: none; }
+        #overlays-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 5; pointer-events: none; }
+        
+        .interactive { pointer-events: auto; }
+        
+        /* Glassmorphism Styles */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Stats Panel */
+        #stats-panel { position: absolute; top: 20px; left: 20px; padding: 20px; width: 250px; }
+        #stats-panel h2 { margin: 0 0 15px 0; font-size: 26px; color: #2c3e50; text-shadow: 1px 1px 2px rgba(255,255,255,0.8); text-align: center; }
+        .stat-line { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 18px; font-weight: 600; color: #34495e; }
+        
+        .btn-sell { 
+            width: 100%; padding: 12px; background: linear-gradient(135deg, #ffaa00, #ff8800); 
+            border: none; border-radius: 12px; font-family: 'Kanit'; font-weight: 600; font-size: 16px; 
+            color: white; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.4); margin-top: 10px;
+        }
+        .btn-sell:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(255, 170, 0, 0.6); }
+        .btn-sell:active { transform: translateY(1px); }
+
+        /* Shop Panel */
+        #shop-panel { position: absolute; top: 80px; right: 20px; padding: 20px; width: 300px; max-height: calc(100vh - 100px); overflow-y: auto; display: none; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { 
+            flex: 1; padding: 10px; text-align: center; background: rgba(255,255,255,0.5); 
+            border: none; border-radius: 12px; font-family: 'Kanit'; font-weight: 600; font-size: 16px; 
+            color: #555; cursor: pointer; transition: 0.3s; 
+        }
+        .tab-btn.active { background: #4CAF50; color: white; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.4); }
+        
+        .shop-item { 
+            background: rgba(255,255,255,0.7); padding: 15px; border-radius: 16px; margin-bottom: 15px; 
+            cursor: pointer; transition: 0.2s; border: 3px solid transparent; 
+        }
+        .shop-item:hover { background: rgba(255,255,255,0.9); transform: translateX(-5px); }
+        .shop-item.selected { border-color: #4CAF50; background: rgba(230, 255, 230, 0.9); box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); }
+        .shop-item h4 { margin: 0 0 5px 0; font-size: 20px; color: #2c3e50; }
+        .shop-item p { margin: 0; font-size: 14px; color: #555; }
+        
+        .build-btn { 
+            width: 100%; padding: 12px; background: #2196F3; color: white; border: none; border-radius: 12px; 
+            font-family: 'Kanit'; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 15px; transition: 0.2s;
+        }
+        .build-btn:hover { background: #1976D2; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4); }
+        .build-btn:disabled { background: #aaa; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* Quiz Modal */
+        #quiz-modal { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            text-align: center; display: none; width: 350px; overflow: hidden; padding: 0; padding-bottom: 20px; border: 3px solid #3498db;
+        }
+        #quiz-question { font-size: 36px; margin: 20px 0; color: #2c3e50; }
+        .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .quiz-btn { 
+            padding: 15px; font-size: 24px; font-family: 'Kanit'; font-weight: 600; 
+            border: none; border-radius: 12px; background: white; color: #2c3e50; 
+            cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        }
+        .quiz-btn:hover { background: #e0f7fa; transform: scale(1.05); color: #00796b; }
+        
+        /* Overlays */
+        .floating-text { 
+            position: absolute; font-weight: 600; font-size: 26px; 
+            text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff; 
+            pointer-events: none; transform: translate(-50%, -50%); z-index: 100;
+        }
+        
+        .progress-bar-container { 
+            position: absolute; width: 60px; height: 10px; background: rgba(0,0,0,0.6); 
+            border-radius: 5px; transform: translate(-50%, -50%); pointer-events: none; 
+            border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 15;
+        }
+        .progress-bar-fill { height: 100%; background: #4CAF50; width: 0%; border-radius: 3px; transition: width 0.1s linear; }
+
+        .water-drop { font-size: 24px; filter: grayscale(100%) opacity(0.3); transition: 0.3s; }
+        .water-drop.active { filter: none; }
+
+        #robot-label { 
+            position: absolute; padding: 6px 16px; font-weight: 600; border-radius: 20px; 
+            transform: translate(-50%, -120%); transition: none; white-space: nowrap; font-size: 16px; 
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }
+        
+        /* Start Screen Overlay */
+        #start-screen { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: linear-gradient(to bottom, rgba(135,206,235,0.9), rgba(70,150,200,0.9)); 
+            z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        }
+        #start-screen h1 { font-size: 72px; color: white; text-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 30px; text-align: center; }
+        #start-btn { 
+            padding: 20px 50px; font-size: 28px; background: linear-gradient(135deg, #ffaa00, #ff8800); 
+            color: white; border: none; border-radius: 40px; font-family: 'Kanit'; cursor: pointer; 
+            box-shadow: 0 8px 20px rgba(255, 170, 0, 0.5); transition: 0.3s; font-weight: 600; 
+        }
+        #start-btn:hover { transform: scale(1.1); box-shadow: 0 12px 30px rgba(255, 170, 0, 0.7); }
+
+        /* Auth Screen Overlay */
+        #auth-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px);
+            z-index: 200; display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .auth-panel {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 40px; border-radius: 20px; text-align: center; width: 350px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3); font-family: 'Kanit';
+        }
+        .auth-panel h2 { margin: 0 0 20px 0; color: #2c3e50; }
+        .auth-input {
+            width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #ddd;
+            border-radius: 10px; font-size: 16px; font-family: 'Kanit'; outline: none; transition: 0.2s;
+        }
+        .auth-input:focus { border-color: #3498db; }
+        .auth-btn-row { display: flex; gap: 10px; }
+        .auth-btn {
+            flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 16px;
+            font-weight: 600; font-family: 'Kanit'; cursor: pointer; color: white; transition: 0.2s;
+        }
+        .btn-login { background: #3498db; }
+        .btn-login:hover { background: #2980b9; }
+        .btn-register { background: #2ecc71; }
+        .btn-register:hover { background: #27ae60; }
+        #auth-status { margin-top: 15px; font-size: 14px; color: #e74c3c; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas Container -->
+    <div id="game-container"></div>
+
+    <!-- Auth Overlay -->
+    <div id="auth-screen">
+        <div class="auth-panel">
+            <h2>ลงชื่อเข้าใช้ (Login)</h2>
+            <input type="text" id="auth-username" class="auth-input" placeholder="Username" />
+            <input type="password" id="auth-password" class="auth-input" placeholder="Password" />
+            <div class="auth-btn-row">
+                <button class="auth-btn btn-login" onclick="handleAuth('login')">เข้าสู่ระบบ</button>
+                <button class="auth-btn btn-register" onclick="handleAuth('register')">สมัครสมาชิก</button>
+            </div>
+            <div id="auth-status"></div>
+        </div>
+    </div>
+
+    <!-- UI Overlay (Pointer Events Managed) -->
+    <div id="ui-container" style="display: none;">
+        
+        <!-- Water UI -->
+        <div id="water-ui" class="glass-panel interactive" style="position: absolute; top: 20px; left: 290px; padding: 10px 20px; display: flex; gap: 10px; align-items: center;">
+            <span class="water-drop active">💧</span>
+            <span class="water-drop active">💧</span>
+            <span class="water-drop active">💧</span>
+            <span class="water-drop active">💧</span>
+            <span class="water-drop active">💧</span>
+        </div>
+
+        <!-- Stats Panel -->
+        <div id="stats-panel" class="glass-panel interactive">
+            <h2>Mini Farm Island</h2>
+            <div id="player-label" style="text-align:center; font-size:14px; color:#555; margin-bottom:10px; font-weight:600;"></div>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                <div id="level-badge" style="background: #3498db; color: white; padding: 5px 10px; border-radius: 50%; font-weight: bold; font-family: 'Kanit';">Lv.1</div>
+                <div style="flex: 1; background: #ddd; height: 12px; border-radius: 6px; position: relative; overflow: hidden;">
+                    <div id="exp-bar" style="position: absolute; top: 0; left: 0; height: 100%; background: #4CAF50; width: 0%; transition: width 0.3s;"></div>
+                </div>
+            </div>
+            <div class="stat-line"><span>เงิน 🪙:</span> <span style="color:#f39c12;"><span id="coins-display">100</span></span></div>
+            <div class="stat-line"><span>คลังสินค้า:</span> <span id="inventory-display">0 / 0 🪙</span></div>
+            <button class="btn-sell" onclick="sellAll()">ขายผลผลิตทั้งหมด 💰</button>
+            <button class="btn-sell" style="background: linear-gradient(135deg, #3498db, #2980b9); margin-top:8px;" onclick="saveGame(false)">เซฟเกม 💾</button>
+        </div>
+
+        <button id="shop-toggle-btn" class="glass-panel interactive" onclick="toggleShop()" style="position: absolute; top: 20px; right: 20px; padding: 12px 25px; background: #4CAF50; color: white; border: none; font-family: 'Kanit'; font-size: 18px; font-weight: 600; cursor: pointer; z-index: 20; box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);">
+            🛒 ร้านค้า & ก่อสร้าง
+        </button>
+
+        <!-- Shop & Build Panel -->
+        <div id="shop-panel" class="glass-panel interactive">
+            <div class="tabs">
+                <button class="tab-btn active" id="tab-seeds" onclick="switchTab('seeds')">🌱 เมล็ดพันธุ์</button>
+                <button class="tab-btn" id="tab-build" onclick="switchTab('build')">🔨 ก่อสร้าง</button>
+            </div>
+            
+            <div id="content-seeds">
+                <div class="shop-item selected" onclick="selectSeed('tomato', this)">🍅 มะเขือเทศ<br>(ทุน 10, ขาย 25, 5 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('carrot', this)">🥕 แครอท<br>(ทุน 20, ขาย 60, 8 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('cabbage', this)">🥬 กะหล่ำปลี<br>(ทุน 50, ขาย 200, 12 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('pumpkin', this)">🎃 ฟักทอง<br>(ทุน 100, ขาย 350, 20 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('strawberry', this)">🍓 สตรอว์เบอร์รี<br>(ทุน 150, ขาย 500, 25 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('corn', this)">🌽 ข้าวโพด<br>(ทุน 250, ขาย 800, 35 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('watermelon', this)">🍉 แตงโม<br>(ทุน 400, ขาย 1200, 45 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('eggplant', this)">🍆 มะเขือม่วง<br>(ทุน 600, ขาย 1800, 60 วิ)</div>
+                <div class="shop-item" onclick="selectSeed('potato', this)">🥔 มันฝรั่ง<br>(ทุน 1000, ขาย 2800, 80 วิ)</div>
+            </div>
+            
+            <div id="content-build" style="display:none;">
+                <button class="build-btn" id="btn-expand" onclick="expandPlot()">ขยายแปลงผัก (150 🪙)</button>
+                <button class="build-btn" id="btn-upgrade" onclick="upgradeHouse()">ต่อเติมบ้าน ระดับ 2 (300 🪙)</button>
+            </div>
+        </div>
+
+        <!-- Robot Math Quiz Modal -->
+        <div id="quiz-modal" class="glass-panel interactive">
+            <div style="background: #3498db; color: white; padding: 15px; font-size: 24px; font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">
+                💧 เติมน้ำที่บ่อ
+            </div>
+            <p style="margin: 15px 0 5px 0; color: #555; font-size: 16px;">ตอบคำถามถูกรับน้ำ 2 หยด!</p>
+            <h2 id="quiz-question" style="margin-top: 5px;">5 + 3 = ?</h2>
+            <div class="quiz-options" id="quiz-options" style="padding: 0 20px;">
+                <!-- Options injected by JS -->
+            </div>
+            <button onclick="document.getElementById('quiz-modal').style.display='none'" style="margin-top: 20px; background: none; border: none; font-family: 'Kanit'; font-size: 16px; color: #7f8c8d; cursor: pointer; text-decoration: underline;">ปิดหน้าต่าง</button>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="interactive">
+            <h1>Mini Farm Island 3D</h1>
+            <button id="start-btn" onclick="startGame()">เริ่มเกม 🚀</button>
+        </div>
+
+    </div>
+
+    <!-- HTML Overlays for 3D Tracking -->
+    <div id="overlays-container">
+    </div>
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <!-- Game Logic -->
+    <script>
+        // --- Game State ---
+        const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEXH9Vid5wQIkSsD5B_7S9uar6_lx9gNgxTvI754T9jwwO0Agqx8y6JFjMjWbxO0Rt/exec';
+        let currentUsername = '';
+        let playerLevel = 1;
+        let playerExp = 0;
+        let maxExp = 100;
+        let unlockedIslandsCount = 0;
+        let coins = 100;
+        let inventoryCount = 0;
+        let inventoryValue = 0;
+        let unlockedPlots = 6;
+        let houseLevel = 1;
+        let currentSeed = 'tomato';
+        
+        const PLANTS = {
+            tomato: { name: 'มะเขือเทศ', cost: 10, sell: 25, exp: 10, time: 5, color: 0xff3333, scale: 1 },
+            carrot: { name: 'แครอท', cost: 20, sell: 60, exp: 20, time: 8, color: 0xff8800, scale: 0.8 },
+            cabbage: { name: 'กะหล่ำปลี', cost: 50, sell: 200, exp: 50, time: 12, color: 0xaaee88, scale: 1.2 },
+            pumpkin: { name: 'ฟักทอง', cost: 100, sell: 350, exp: 80, time: 20, color: 0xffa500, scale: 1.3 },
+            strawberry: { name: 'สตรอว์เบอร์รี', cost: 150, sell: 500, exp: 120, time: 25, color: 0xff0055, scale: 0.8 },
+            corn: { name: 'ข้าวโพด', cost: 250, sell: 800, exp: 180, time: 35, color: 0xffdd00, scale: 1.2 },
+            watermelon: { name: 'แตงโม', cost: 400, sell: 1200, exp: 250, time: 45, color: 0x22aa44, scale: 1.4 },
+            eggplant: { name: 'มะเขือม่วง', cost: 600, sell: 1800, exp: 350, time: 60, color: 0x8844cc, scale: 1.1 },
+            potato: { name: 'มันฝรั่ง', cost: 1000, sell: 2800, exp: 500, time: 80, color: 0xccaa77, scale: 1 }
+        };
+
+        let plots = [];
+        let subIslands = [];
+        const ISLAND_REQS = [
+            { level: 2, cost: 500 },
+            { level: 3, cost: 1000 },
+            { level: 4, cost: 2000 }
+        ];
+
+        // --- Three.js Variables ---
+        let scene, camera, renderer, controls;
+        let water;
+        let clock = new THREE.Clock();
+        let trees = [];
+        let smokeParticles = [];
+        let waterParticles = [];
+        let sparkParticles = [];
+        let houseGroup;
+        let robotGroup, catTail;
+        let wellGroup;
+        let floatingTexts = [];
+        let isGameStarted = false;
+        let waterDrops = 5;
+        const maxWaterDrops = 5;
+        let walkTime = 0;
+        const keys = { w: false, a: false, s: false, d: false };
+
+        // --- Tone.js Audio ---
+        let synth, popSynth, errorSynth, coinSynth;
+
+        function initAudio() {
+            const limiter = new Tone.Limiter(-6).toDestination();
+            synth = new Tone.PolySynth(Tone.Synth).connect(limiter);
+            popSynth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).connect(limiter);
+            errorSynth = new Tone.Synth({ oscillator: { type: 'sawtooth' }, envelope: { attack: 0.05, decay: 0.2, sustain: 0, release: 0.2 } }).connect(limiter);
+            coinSynth = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.5 } }).connect(limiter);
+        }
+
+        function playSound(type) {
+            if (!isGameStarted) return;
+            const now = Tone.now();
+            switch(type) {
+                case 'plant': popSynth.triggerAttackRelease("C5", "16n", now); break;
+                case 'harvest': synth.triggerAttackRelease(["C5", "E5", "G5"], "8n", now); break;
+                case 'sell': coinSynth.triggerAttackRelease("G5", "8n", now); break;
+                case 'error': errorSynth.triggerAttackRelease("C3", "8n", now); break;
+                case 'buff': synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "4n", now); break;
+                case 'break': 
+                    errorSynth.triggerAttackRelease("G2", "4n", now); 
+                    setTimeout(() => { if(isGameStarted) errorSynth.triggerAttackRelease("C2", "4n", Tone.now()); }, 150); 
+                    break;
+            }
+        }
+
+        // ============================================================
+        // --- Google Sheets Auth & Cloud Save ---
+        // ============================================================
+        // Helper: POST to Apps Script (avoids GET redirect CORS issues)
+        async function callAPI(payload) {
+            const res = await fetch(APP_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            return res.json();
+        }
+
+        async function handleAuth(action) {
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            const statusEl = document.getElementById('auth-status');
+
+            if (!username || !password) {
+                statusEl.textContent = 'กรุณากรอก Username และ Password ให้ครบถ้วน';
+                return;
+            }
+
+            statusEl.style.color = '#3498db';
+            statusEl.textContent = action === 'login' ? 'กำลังเข้าสู่ระบบ...' : 'กำลังสมัคร...';
+
+            try {
+                const data = await callAPI({ action, username, password });
+
+                if (data.status === 'ok') {
+                    currentUsername = username;
+                    statusEl.style.color = '#2ecc71';
+                    statusEl.textContent = action === 'login' ? 'เข้าสู่ระบบสำเร็จ!' : 'สมัครสำเร็จ!';
+                    if (data.gameState) {
+                        try { applyGameState(JSON.parse(data.gameState)); } catch(e) {}
+                    }
+                    setTimeout(() => {
+                        document.getElementById('auth-screen').style.display = 'none';
+                        document.getElementById('ui-container').style.display = 'block';
+                        document.getElementById('player-label').textContent = `👋 ${username}`;
+                        updateUI();
+                        if (!isGameStarted) startGame();
+                        sendLog(action === 'login' ? 'login' : 'register');
+                    }, 800);
+                } else {
+                    statusEl.style.color = '#e74c3c';
+                    statusEl.textContent = data.message || 'เกิดข้อผิดพลาด';
+                    console.log('Auth error:', data);
+                }
+            } catch(e) {
+                statusEl.style.color = '#e74c3c';
+                statusEl.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้';
+                console.error(e);
+            }
+        }
+
+        function sendLog(action) {
+            if (!currentUsername) return;
+            callAPI({ action: 'log', username: currentUsername, logAction: action, timestamp: new Date().toISOString() }).catch(() => {});
+        }
+
+        function saveGame(isAutoSave) {
+            if (!currentUsername) return;
+            const gameState = {
+                coins, playerLevel, playerExp, maxExp,
+                unlockedIslandsCount, unlockedPlots, houseLevel, waterDrops,
+                plots: plots.map(p => ({ state: p.state, plantType: p.plantType, progress: p.progress, maxTime: p.maxTime, isUnlocked: p.isUnlocked }))
+            };
+            callAPI({ action: 'save', username: currentUsername, gameState: JSON.stringify(gameState) }).then(() => {
+                if (!isAutoSave) {
+                    showFloatingText('บันทึกเกมสำเร็จ! 💾', robotGroup ? robotGroup.position : new THREE.Vector3(0,2,0), '#3498db');
+                }
+            }).catch(() => {});
+        }
+
+        function applyGameState(gs) {
+            if (!gs) return;
+            coins = gs.coins || 100;
+            playerLevel = gs.playerLevel || 1;
+            playerExp = gs.playerExp || 0;
+            maxExp = gs.maxExp || 100;
+            unlockedIslandsCount = gs.unlockedIslandsCount || 0;
+            unlockedPlots = gs.unlockedPlots || 6;
+            houseLevel = gs.houseLevel || 1;
+            waterDrops = gs.waterDrops !== undefined ? gs.waterDrops : 5;
+        }
+
+        // ============================================================
+
+        // --- Utility Functions ---
+        function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        
+        function toScreenXY(position, cam, rend) {
+            const pos = position.clone();
+            pos.project(cam);
+            const rect = rend.domElement.getBoundingClientRect();
+            const x = (pos.x * 0.5 + 0.5) * rect.width;
+            const y = (pos.y * -0.5 + 0.5) * rect.height;
+            return { x, y };
+        }
+
+        function showFloatingText(text, pos, color) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            el.style.color = color;
+            document.getElementById('overlays-container').appendChild(el);
+            floatingTexts.push({ el: el, position: pos.clone(), life: 1.5 });
+        }
+
+        // --- Initialization ---
+        function init() {
+            // Setup Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
+
+            // Setup Camera
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 18, 30);
+
+            // Setup Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('game-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent under-ground
+            controls.minDistance = 10;
+            controls.maxDistance = 60;
+            controls.target.set(0, 0, 0);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.left = -25;
+            dirLight.shadow.camera.right = 25;
+            dirLight.shadow.camera.top = 25;
+            dirLight.shadow.camera.bottom = -25;
+            scene.add(dirLight);
+
+            buildEnvironment();
+            
+            // Events
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('pointerdown', onPointerDown);
+
+            // Start Loop
+            clock.start();
+            animate();
+        }
+
+        // --- Environment Building ---
+        function buildEnvironment() {
+            // Water
+            const waterGeo = new THREE.PlaneGeometry(300, 300, 40, 40);
+            waterGeo.rotateX(-Math.PI / 2);
+            const waterMat = new THREE.MeshPhongMaterial({ color: 0x44aaff, transparent: true, opacity: 0.8, flatShading: true });
+            water = new THREE.Mesh(waterGeo, waterMat);
+            water.position.y = 0;
+            water.receiveShadow = true;
+            scene.add(water);
+
+            // Island Materials - rich earthy tones with flat shading
+            const islandTopMat   = new THREE.MeshLambertMaterial({ color: 0x5cb85c });
+            const islandSideMat  = new THREE.MeshLambertMaterial({ color: 0x8b5e3c });
+            const islandRockMat  = new THREE.MeshLambertMaterial({ color: 0x6e5640, flatShading: true });
+            const islandMatArr   = [islandSideMat, islandTopMat, islandRockMat];
+            const islandTopMatL  = new THREE.MeshLambertMaterial({ color: 0x3d6e3d });
+            const islandSideMatL = new THREE.MeshLambertMaterial({ color: 0x4e3520 });
+            const islandMatLockArr = [islandSideMatL, islandTopMatL, islandSideMatL];
+
+            // Helper: add flower clumps
+            function addFlowers(grp, count, radius) {
+                const fc = [0xff6688, 0xffcc00, 0xff9944, 0xee44aa, 0xffffff];
+                for (let f = 0; f < count; f++) {
+                    const angle = (f / count) * Math.PI * 2 + Math.random();
+                    const r = Math.random() * radius * 0.7;
+                    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.35,4), new THREE.MeshLambertMaterial({color:0x338833}));
+                    stem.position.set(Math.cos(angle)*r, 0.18, Math.sin(angle)*r);
+                    const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.18,5,4), new THREE.MeshLambertMaterial({color:fc[f%fc.length], flatShading:true}));
+                    bloom.position.y = 0.35;
+                    stem.add(bloom);
+                    grp.add(stem);
+                }
+            }
+
+            // Helper: add rocks around edge
+            function addRocks(grp, count, radius) {
+                for (let r = 0; r < count; r++) {
+                    const angle = (r / count) * Math.PI * 2;
+                    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3 + Math.random()*0.2, 0), new THREE.MeshLambertMaterial({color:0x888888, flatShading:true}));
+                    rock.position.set(Math.cos(angle)*radius, -0.1, Math.sin(angle)*radius);
+                    rock.rotation.set(Math.random(), Math.random(), Math.random());
+                    rock.castShadow = true;
+                    grp.add(rock);
+                }
+            }
+
+            // --- Main Island (multi-layer) ---
+            const mainIslandGroup = new THREE.Group();
+            const mainTop = new THREE.Mesh(new THREE.CylinderGeometry(16, 15, 1.5, 48), islandMatArr);
+            const mainMid = new THREE.Mesh(new THREE.CylinderGeometry(15, 13, 1.2, 48), [islandRockMat, islandRockMat, islandRockMat]);
+            const mainBot = new THREE.Mesh(new THREE.CylinderGeometry(13, 10, 0.8, 48), [islandRockMat, islandRockMat, islandRockMat]);
+            mainTop.position.y = 0.6; mainMid.position.y = -0.35; mainBot.position.y = -1.15;
+            [mainTop, mainMid, mainBot].forEach(m => { m.receiveShadow = true; m.castShadow = true; });
+            mainTop.userData.isGround = true;
+            mainIslandGroup.add(mainTop, mainMid, mainBot);
+            addFlowers(mainIslandGroup, 14, 13);
+            addRocks(mainIslandGroup, 8, 14.5);
+            mainIslandGroup.position.y = 0;
+            scene.add(mainIslandGroup);
+
+            // --- Small Islands ---
+            const smallPos = [ [-26, 0, -12], [24, 0, -16], [0, 0, -28] ];
+            smallPos.forEach((p, idx) => {
+                const isUnlocked = idx < unlockedIslandsCount;
+                const matArr  = isUnlocked ? islandMatArr : islandMatLockArr;
+                const rockMat = isUnlocked ? islandRockMat : islandSideMatL;
+
+                const islandGroup = new THREE.Group();
+                const iTop = new THREE.Mesh(new THREE.CylinderGeometry(7, 6.5, 1.2, 28), matArr);
+                const iMid = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 5, 0.9, 28), [rockMat, rockMat, rockMat]);
+                const iBot = new THREE.Mesh(new THREE.CylinderGeometry(5, 3.5, 0.6, 28), [rockMat, rockMat, rockMat]);
+                iTop.position.y = 0.5; iMid.position.y = -0.25; iBot.position.y = -0.85;
+                [iTop, iMid, iBot].forEach(m => { m.receiveShadow = true; m.castShadow = true; });
+                iTop.userData.isGround = true;
+                iTop.userData.islandIndex = idx;
+                islandGroup.add(iTop, iMid, iBot);
+
+                if (isUnlocked) { addFlowers(islandGroup, 8, 5.5); addRocks(islandGroup, 5, 6.5); }
+
+                // Lock sign on locked islands
+                if (!isUnlocked) {
+                    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,2.5,6), new THREE.MeshLambertMaterial({color:0x5c4033}));
+                    post.position.set(0, 2.0, 0);
+                    const sign = new THREE.Mesh(new THREE.BoxGeometry(1.8,1.0,0.15), new THREE.MeshLambertMaterial({color:0xff4444}));
+                    sign.position.y = 0.9;
+                    post.add(sign);
+                    islandGroup.add(post);
+                }
+
+                islandGroup.position.set(p[0], -0.5, p[2]);
+                scene.add(islandGroup);
+
+                // === Beautiful Wooden Bridge ===
+                const dist = Math.hypot(p[0], p[2]);
+                const bridgeLen = dist - 16 - 7 + 2;
+                const bridgeGroup = new THREE.Group();
+
+                const deckMat     = new THREE.MeshLambertMaterial({ color: 0x5c4033 });
+                const plankMat    = new THREE.MeshLambertMaterial({ color: 0x9b6a3e });
+                const plankAltMat = new THREE.MeshLambertMaterial({ color: 0xb07d4c });
+                const railMat     = new THREE.MeshLambertMaterial({ color: 0x4a3220 });
+                const ropeMat     = new THREE.MeshLambertMaterial({ color: 0xccaa66 });
+
+                // Deck base
+                const deckBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.18, bridgeLen), deckMat);
+                deckBase.userData.isGround = true;
+                deckBase.userData.islandIndex = idx;
+                deckBase.receiveShadow = true;
+                bridgeGroup.add(deckBase);
+
+                // Alternating planks
+                for (let i = 0; i < bridgeLen; i += 0.9) {
+                    const mat = Math.floor(i) % 2 === 0 ? plankMat : plankAltMat;
+                    const plank = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.12, 0.72), mat);
+                    plank.position.set(0, 0.14, -bridgeLen/2 + i + 0.45);
+                    plank.castShadow = true; plank.receiveShadow = true;
+                    bridgeGroup.add(plank);
+                }
+
+                // Rail posts
+                const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.4, 6);
+                for (let i = 1.0; i < bridgeLen - 0.5; i += 2.5) {
+                    [-1.35, 1.35].forEach(xOff => {
+                        const post = new THREE.Mesh(postGeo, railMat);
+                        post.position.set(xOff, 0.7, -bridgeLen/2 + i);
+                        post.castShadow = true;
+                        bridgeGroup.add(post);
+                    });
+                }
+
+                // Top rope
+                [-1.35, 1.35].forEach(xOff => {
+                    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,bridgeLen,6), ropeMat);
+                    rope.rotation.x = Math.PI / 2;
+                    rope.position.set(xOff, 1.2, 0);
+                    bridgeGroup.add(rope);
+                });
+
+                // Mid rope
+                [-1.35, 1.35].forEach(xOff => {
+                    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,bridgeLen,6), ropeMat);
+                    rope.rotation.x = Math.PI / 2;
+                    rope.position.set(xOff, 0.7, 0);
+                    bridgeGroup.add(rope);
+                });
+
+                // Lanterns at bridge ends
+                [-(bridgeLen/2 - 0.6), (bridgeLen/2 - 0.6)].forEach(zOff => {
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,2.2,6), railMat);
+                    pole.position.set(0, 1.1, zOff);
+                    const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.4), new THREE.MeshLambertMaterial({color:0xffdd44, emissive:0xffaa00, emissiveIntensity:0.8}));
+                    lantern.position.y = 1.2;
+                    pole.add(lantern);
+                    bridgeGroup.add(pole);
+                });
+
+                bridgeGroup.position.set(p[0]/2, 1.0, p[2]/2);
+                bridgeGroup.lookAt(new THREE.Vector3(p[0], 1.0, p[2]));
+                scene.add(bridgeGroup);
+
+                subIslands.push({ mesh: iTop, bridge: bridgeGroup, isUnlocked: isUnlocked, pos: p, group: islandGroup });
+            });
+
+            // Trees - multi-layer foliage
+            const treePos = [ [12, 8], [-12, 10], [14, -4], [-13, -5], [9, -13], [-9, -12], [-26, -12], [24, -16], [0, -28] ];
+            const leafColors = [0x2d8a2d, 0x3aaa3a, 0x259025, 0x44bb44];
+            treePos.forEach((p, ti) => {
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.25, 0.38, 1.8, 7),
+                    new THREE.MeshLambertMaterial({ color: 0x6b4226 })
+                );
+                trunk.position.y = 0.9;
+                const leafMat = new THREE.MeshLambertMaterial({ color: leafColors[ti % leafColors.length], flatShading: true });
+                const leaf1 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 2.4, 7), leafMat);
+                leaf1.position.y = 2.4;
+                const leaf2 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 2.0, 6), leafMat);
+                leaf2.position.y = 3.6;
+                const leaf3 = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.4, 5), leafMat);
+                leaf3.position.y = 4.6;
+                tree.add(trunk, leaf1, leaf2, leaf3);
+                tree.position.set(p[0], p[2] < -20 || Math.abs(p[0]) > 20 ? 0.5 : 1.5, p[1]);
+                tree.traverse(c => { if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+                scene.add(tree);
+                trees.push(tree);
+            });
+
+            createFarmPlots();
+            updateHouse();
+            createWell();
+            buildRobot();
+            initSmoke();
+        }
+
+        function createFarmPlots() {
+            const plotGeo = new THREE.PlaneGeometry(1.8, 1.8);
+            const plotMatEmpty = new THREE.MeshLambertMaterial({ color: 0x6e4b39 });
+            const plotMatLocked = new THREE.MeshLambertMaterial({ color: 0x4a3226 });
+
+            let index = 0;
+            // Grid 4x3
+            for (let j = 0; j < 3; j++) {
+                for (let i = 0; i < 4; i++) {
+                    const isUnlocked = index < unlockedPlots;
+                    const mesh = new THREE.Mesh(plotGeo, isUnlocked ? plotMatEmpty : plotMatLocked);
+                    mesh.rotation.x = -Math.PI / 2;
+                    mesh.position.set(i * 2 - 3, 1.51, j * 2 + 1); // Centered, in front
+                    mesh.receiveShadow = true;
+                    mesh.userData.isPlot = true;
+                    scene.add(mesh);
+                    
+                    plots.push({
+                        index: index,
+                        mesh: mesh,
+                        isUnlocked: isUnlocked,
+                        state: 'empty',
+                        plantMesh: null,
+                        plantType: null,
+                        progress: 0,
+                        maxTime: 0,
+                        uiElement: null
+                    });
+                    index++;
+                }
+            }
+        }
+
+        function generatePlotsForIsland(idx) {
+            const islandData = subIslands[idx];
+            const p = islandData.pos;
+            const plotGeo = new THREE.PlaneGeometry(1.8, 1.8);
+            const plotMatEmpty = new THREE.MeshLambertMaterial({ color: 0x6e4b39 });
+            
+            for (let j = 0; j < 2; j++) {
+                for (let i = 0; i < 2; i++) {
+                    const mesh = new THREE.Mesh(plotGeo, plotMatEmpty);
+                    mesh.rotation.x = -Math.PI / 2;
+                    mesh.position.set(p[0] + i * 2 - 1, 0.51, p[2] + j * 2 - 1);
+                    mesh.receiveShadow = true;
+                    mesh.userData.isPlot = true;
+                    scene.add(mesh);
+                    
+                    plots.push({
+                        mesh: mesh,
+                        isUnlocked: true,
+                        state: 'empty',
+                        plantMesh: null,
+                        plantType: null,
+                        progress: 0,
+                        maxTime: 0,
+                        uiElement: null
+                    });
+                }
+            }
+        }
+
+        function updateHouse() {
+            if (houseGroup) scene.remove(houseGroup);
+            houseGroup = new THREE.Group();
+            houseGroup.position.set(-6, 1.5, -5);
+            
+            const wallMat = new THREE.MeshLambertMaterial({ color: 0xf5f5f5 });
+            const roofMat = new THREE.MeshLambertMaterial({ color: 0xdd5555 });
+            const woodMat = new THREE.MeshLambertMaterial({ color: 0x5c4033 });
+
+            // Level 1: Basic
+            const base = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), wallMat);
+            base.position.y = 1.5;
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 2.5, 4), roofMat);
+            roof.position.y = 4.25;
+            roof.rotation.y = Math.PI / 4;
+            houseGroup.add(base, roof);
+            
+            const door = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), woodMat);
+            door.position.set(0, 1, 2.01);
+            houseGroup.add(door);
+
+            if (houseLevel >= 2) {
+                // Extension
+                const sideRoom = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), wallMat);
+                sideRoom.position.set(-3.25, 1, 0);
+                const sideRoof = new THREE.Mesh(new THREE.ConeGeometry(2, 1.5, 4), roofMat);
+                sideRoof.position.set(-3.25, 2.75, 0);
+                sideRoof.rotation.y = Math.PI / 4;
+                houseGroup.add(sideRoom, sideRoof);
+            }
+            if (houseLevel >= 3) {
+                // Second Floor
+                const secondFloor = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.5, 3.5), wallMat);
+                secondFloor.position.y = 4.25;
+                roof.position.y = 6.75; 
+                houseGroup.add(secondFloor);
+            }
+
+            // Chimney
+            const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2, 0.6), new THREE.MeshLambertMaterial({color:0x888888}));
+            chimney.position.set(1, houseLevel >= 3 ? 6.5 : 4, -1);
+            houseGroup.add(chimney);
+
+            houseGroup.traverse(c => { if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+            scene.add(houseGroup);
+        }
+
+        function createWell() {
+            wellGroup = new THREE.Group();
+            const well = wellGroup;
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.2), new THREE.MeshLambertMaterial({color:0x777777}));
+            base.position.y = 0.6;
+            const roofGeo = new THREE.ConeGeometry(1.2, 1, 4);
+            const roof = new THREE.Mesh(roofGeo, new THREE.MeshLambertMaterial({color:0xcc5555}));
+            roof.position.y = 2.8;
+            roof.rotation.y = Math.PI / 4;
+            const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2), new THREE.MeshLambertMaterial({color:0x5c4033}));
+            p1.position.set(0.85, 1.8, 0);
+            const p2 = p1.clone();
+            p2.position.set(-0.85, 1.8, 0);
+            well.add(base, roof, p1, p2);
+            well.position.set(5, 1.5, -4);
+            well.traverse(c => { if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+            scene.add(well);
+        }
+
+        function buildRobot() {
+            robotGroup = new THREE.Group();
+            
+            // Cat Body (White/Orange theme)
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.9), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+            body.position.y = 0.6;
+            
+            // Head
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.8), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+            head.position.y = 1.55;
+            
+            // Ears
+            const earGeo = new THREE.ConeGeometry(0.25, 0.4, 4);
+            const earMat = new THREE.MeshLambertMaterial({ color: 0xff9900 });
+            const ear1 = new THREE.Mesh(earGeo, earMat);
+            ear1.position.set(0.3, 2.0, 0);
+            ear1.rotation.y = Math.PI / 4;
+            const ear2 = new THREE.Mesh(earGeo, earMat);
+            ear2.position.set(-0.3, 2.0, 0);
+            ear2.rotation.y = Math.PI / 4;
+            
+            // Eyes
+            const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const eyeMat = new THREE.MeshLambertMaterial({color: 0x222222});
+            const eye1 = new THREE.Mesh(eyeGeo, eyeMat);
+            eye1.position.set(0.2, 1.6, -0.41);
+            const eye2 = eye1.clone();
+            eye2.position.set(-0.2, 1.6, -0.41);
+            
+            // Whiskers (simple boxes)
+            const whiskerGeo = new THREE.BoxGeometry(0.5, 0.02, 0.02);
+            const w1 = new THREE.Mesh(whiskerGeo, eyeMat);
+            w1.position.set(0.5, 1.55, -0.41);
+            w1.rotation.z = 0.1;
+            const w2 = new THREE.Mesh(whiskerGeo, eyeMat);
+            w2.position.set(-0.5, 1.55, -0.41);
+            w2.rotation.z = -0.1;
+            
+            // Tail
+            catTail = new THREE.Group();
+            catTail.position.set(0, 0.4, 0.45);
+            const tailMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8), new THREE.MeshLambertMaterial({color: 0xff9900}));
+            tailMesh.position.set(0, 0.4, 0.3);
+            tailMesh.rotation.x = Math.PI / 4;
+            catTail.add(tailMesh);
+            
+            robotGroup.add(body, head, ear1, ear2, eye1, eye2, w1, w2, catTail);
+            robotGroup.position.set(-4, 1.5, 4);
+            robotGroup.rotation.y = Math.PI / 4;
+            robotGroup.traverse(c => { if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+            scene.add(robotGroup);
+        }
+
+        function initSmoke() {
+            for (let i = 0; i < 5; i++) {
+                const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0}));
+                smoke.userData = { life: i * 0.6 }; 
+                smokeParticles.push(smoke);
+                scene.add(smoke);
+            }
+        }
+
+        // --- Plant Generation ---
+        function getPlantMesh(type) {
+            const group = new THREE.Group();
+            if (type === 'tomato') {
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), new THREE.MeshLambertMaterial({color: 0xff3333}));
+                body.position.y = 0.4;
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.2), new THREE.MeshLambertMaterial({color: 0x228b22}));
+                stem.position.y = 0.85;
+                group.add(body, stem);
+            } else if (type === 'carrot') {
+                const body = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1, 8), new THREE.MeshLambertMaterial({color: 0xff8800}));
+                body.rotation.x = Math.PI; 
+                body.position.y = 0.5;
+                const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 4), new THREE.MeshLambertMaterial({color: 0x228b22}));
+                leaf.position.y = 1.1;
+                group.add(body, leaf);
+            } else if (type === 'cabbage') {
+                const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4), new THREE.MeshLambertMaterial({color: 0x88ff88, flatShading: true}));
+                body.position.y = 0.4;
+                group.add(body);
+            } else if (type === 'pumpkin') {
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 12), new THREE.MeshLambertMaterial({color: 0xffa500, flatShading: true}));
+                body.scale.set(1, 0.7, 1);
+                body.position.y = 0.35;
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3), new THREE.MeshLambertMaterial({color: 0x005500}));
+                stem.position.y = 0.8;
+                group.add(body, stem);
+            } else if (type === 'strawberry') {
+                const body = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.6, 16), new THREE.MeshLambertMaterial({color: 0xff0055}));
+                body.rotation.x = Math.PI;
+                body.position.y = 0.3;
+                const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.1, 5), new THREE.MeshLambertMaterial({color: 0x228b22}));
+                leaf.position.y = 0.6;
+                group.add(body, leaf);
+            } else if (type === 'corn') {
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8), new THREE.MeshLambertMaterial({color: 0xffdd00}));
+                body.position.y = 0.5;
+                const leaf1 = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 3), new THREE.MeshLambertMaterial({color: 0x22aa22}));
+                leaf1.position.set(0.1, 0.4, 0);
+                leaf1.rotation.z = -0.3;
+                const leaf2 = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 3), new THREE.MeshLambertMaterial({color: 0x22aa22}));
+                leaf2.position.set(-0.1, 0.4, 0);
+                leaf2.rotation.z = 0.3;
+                group.add(body, leaf1, leaf2);
+            } else if (type === 'watermelon') {
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 12), new THREE.MeshLambertMaterial({color: 0x22aa44, flatShading: true}));
+                body.scale.set(1.2, 1, 1);
+                body.position.y = 0.45;
+                group.add(body);
+            } else if (type === 'eggplant') {
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), new THREE.MeshLambertMaterial({color: 0x8844cc}));
+                body.scale.set(1, 1.8, 1);
+                body.position.y = 0.5;
+                const top = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.3, 5), new THREE.MeshLambertMaterial({color: 0x228b22}));
+                top.position.y = 1.05;
+                group.add(body, top);
+            } else if (type === 'potato') {
+                const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3, 1), new THREE.MeshLambertMaterial({color: 0xccaa77, flatShading: true}));
+                body.scale.set(1.3, 0.8, 1);
+                body.position.y = 0.3;
+                group.add(body);
+            }
+            group.traverse(c => { if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+            return group;
+        }
+
+        // --- Interactions ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onPointerDown(event) {
+            if (!isGameStarted) return;
+            // Ignore UI clicks
+            if (event.target.closest('.interactive') || event.target.closest('.glass-panel') || event.target.closest('.progress-bar-container')) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Check Well for Water Refill
+            const wellHit = raycaster.intersectObject(wellGroup, true);
+            if (wellHit.length > 0) {
+                if (waterDrops < maxWaterDrops) {
+                    openQuizModal();
+                } else {
+                    playSound('error');
+                    showFloatingText("น้ำเต็มแล้ว!", wellGroup.position, "#3498db");
+                }
+                return;
+            }
+
+            // Check Ground, Plots, and Islands
+            const intersectsObjects = raycaster.intersectObjects(scene.children, true);
+            if (intersectsObjects.length > 0) {
+                for (let i = 0; i < intersectsObjects.length; i++) {
+                    const obj = intersectsObjects[i].object;
+                    
+                    // Check if clicked a locked island
+                    if (obj.userData.islandIndex !== undefined) {
+                        const idx = obj.userData.islandIndex;
+                        const islandData = subIslands[idx];
+                        if (!islandData.isUnlocked) {
+                            if (idx > unlockedIslandsCount) {
+                                playSound('error');
+                                showFloatingText("ต้องปลดล็อกเกาะก่อนหน้า!", obj.position, "#ff4444");
+                            } else {
+                                const req = ISLAND_REQS[idx];
+                                if (playerLevel >= req.level && coins >= req.cost) {
+                                    coins -= req.cost;
+                                    islandData.isUnlocked = true;
+                                    unlockedIslandsCount++;
+                                    // Change materials array
+                                    const islandMat = [
+                                        new THREE.MeshLambertMaterial({color: 0x8b5a2b}),
+                                        new THREE.MeshLambertMaterial({color: 0x66bb66}),
+                                        new THREE.MeshLambertMaterial({color: 0x8b5a2b})
+                                    ];
+                                    obj.material = islandMat;
+                                    generatePlotsForIsland(idx);
+                                    playSound('buff');
+                                    showFloatingText("ปลดล็อกสำเร็จ!", obj.position, "#4CAF50");
+                                    updateUI();
+                                } else {
+                                    playSound('error');
+                                    showFloatingText(`ต้องการ เลเวล ${req.level} และ ${req.cost} 🪙`, obj.position, "#ff4444");
+                                }
+                            }
+                            return;
+                        }
+                    }
+
+                    if (obj.userData.isPlot) {
+                        const plot = plots.find(p => p.mesh === obj);
+                        if (plot && plot.isUnlocked) {
+                            handlePlotClick(plot);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        function handlePlotClick(plot) {
+            if (plot.state === 'empty') {
+                const pData = PLANTS[currentSeed];
+                if (coins >= pData.cost) {
+                    if (waterDrops >= 1) {
+                        waterDrops -= 1;
+                        coins -= pData.cost;
+                        plot.state = 'growing';
+                    plot.plantType = currentSeed;
+                    plot.progress = 0;
+                    plot.maxTime = pData.time;
+                    
+                    plot.plantMesh = getPlantMesh(currentSeed);
+                    plot.plantMesh.position.copy(plot.mesh.position);
+                    plot.plantMesh.scale.set(0.1, 0.1, 0.1);
+                    scene.add(plot.plantMesh);
+                    
+                    // UI Progress Bar
+                    const cont = document.createElement('div');
+                    cont.className = 'progress-bar-container';
+                    const fill = document.createElement('div');
+                    fill.className = 'progress-bar-fill';
+                    cont.appendChild(fill);
+                    document.getElementById('overlays-container').appendChild(cont);
+                    plot.uiElement = { container: cont, fill: fill };
+                    
+                    playSound('plant');
+                    showFloatingText(`-${pData.cost} 🪙 | -1 💧`, plot.mesh.position, "#ff4444");
+                    updateUI();
+                    } else {
+                        playSound('error');
+                        showFloatingText("น้ำไม่พอ! (คลิกที่บ่อน้ำ)", plot.mesh.position, "#3498db");
+                    }
+                } else {
+                    playSound('error');
+                    showFloatingText("เงินไม่พอ!", plot.mesh.position, "#ff4444");
+                }
+            } else if (plot.state === 'ready') {
+                const pData = PLANTS[plot.plantType];
+                
+                inventoryCount++;
+                inventoryValue += pData.sell;
+                playerExp += pData.exp;
+                
+                // Level Up Check
+                if (playerExp >= maxExp) {
+                    playerExp -= maxExp;
+                    playerLevel++;
+                    maxExp = playerLevel * 100;
+                    playSound('buff');
+                    showFloatingText(`Level UP! 🌟`, robotGroup ? robotGroup.position : plot.mesh.position, "#ffaa00");
+                }
+
+                scene.remove(plot.plantMesh);
+                plot.state = 'empty';
+                plot.plantMesh = null;
+                
+                playSound('harvest');
+                showFloatingText(`+1 📦`, plot.mesh.position, "#ffffff");
+                updateUI();
+            }
+        }
+
+        // --- Game Logic Update Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1); // Cap delta to avoid huge jumps
+            const time = clock.getElapsedTime();
+
+            controls.update();
+
+            // Water Waves
+            const posAttr = water.geometry.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                const x = posAttr.getX(i);
+                const z = posAttr.getZ(i);
+                posAttr.setY(i, Math.sin(x * 0.15 + time * 1.5) * 0.4 + Math.cos(z * 0.15 + time * 1.5) * 0.4);
+            }
+            posAttr.needsUpdate = true;
+            water.geometry.computeVertexNormals();
+            
+            // Trees Sway
+            trees.forEach(t => {
+                t.rotation.z = Math.sin(time * 1.5 + t.position.x) * 0.04;
+                t.rotation.x = Math.cos(time * 1.2 + t.position.z) * 0.04;
+            });
+
+            // Smoke
+            const chimneyY = houseLevel >= 3 ? 8 : 5.5;
+            smokeParticles.forEach(p => {
+                p.userData.life += delta;
+                if (p.userData.life > 3) {
+                    p.userData.life = 0;
+                    p.position.set(houseGroup.position.x + 1, houseGroup.position.y + chimneyY, houseGroup.position.z - 1);
+                }
+                if (p.userData.life > 0) {
+                    p.position.y += delta * 2;
+                    p.position.x += delta * 0.8; 
+                    p.scale.setScalar(1 + p.userData.life * 0.8);
+                    p.material.opacity = Math.max(0, 0.5 - p.userData.life * 0.16);
+                }
+            });
+
+            updateParticles(delta);
+
+            // Robot Movement (WASD)
+            if (robotGroup) {
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+                camDir.y = 0; 
+                camDir.normalize();
+                const right = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0,1,0)).normalize();
+                
+                const moveVec = new THREE.Vector3();
+                if (keys.w) moveVec.add(camDir);
+                if (keys.s) moveVec.sub(camDir);
+                if (keys.a) moveVec.sub(right);
+                if (keys.d) moveVec.add(right);
+
+                if (moveVec.lengthSq() > 0) {
+                    moveVec.normalize();
+                    const speed = 8 * delta;
+                    
+                    const nextPos = robotGroup.position.clone().addScaledVector(moveVec, speed);
+                    nextPos.y = 10;
+                    
+                    const downRay = new THREE.Raycaster(nextPos, new THREE.Vector3(0, -1, 0));
+                    const intersects = downRay.intersectObjects(scene.children, true);
+                    let groundY = 1.5;
+                    let canMove = false;
+                    
+                    for (let i = 0; i < intersects.length; i++) {
+                        const obj = intersects[i].object;
+                        if (obj.userData.isGround || obj.userData.isPlot) {
+                            if (obj.userData.islandIndex !== undefined) {
+                                const idx = obj.userData.islandIndex;
+                                if (!subIslands[idx].isUnlocked) {
+                                    canMove = false;
+                                    break;
+                                }
+                            }
+                            canMove = true;
+                            groundY = intersects[i].point.y;
+                            break;
+                        }
+                    }
+
+                    if (canMove) {
+                        nextPos.y = groundY;
+                        robotGroup.position.copy(nextPos);
+                        
+                        const targetLook = robotGroup.position.clone().add(moveVec);
+                        robotGroup.lookAt(targetLook);
+
+                        walkTime += delta * 15;
+                        robotGroup.position.y = groundY + Math.abs(Math.sin(walkTime)) * 0.3;
+                        robotGroup.rotation.z = Math.sin(walkTime * 0.5) * 0.1;
+                    }
+                } else {
+                    // Smoothly settle down to ground
+                    const currentY = robotGroup.position.y;
+                    const baseGroundY = currentY - (Math.abs(Math.sin(walkTime)) * 0.3);
+                    robotGroup.position.y = baseGroundY;
+                    robotGroup.rotation.z = 0;
+                    walkTime = 0;
+                }
+                
+                if (catTail) {
+                    catTail.rotation.z = Math.sin(walkTime * 0.5) * 0.5;
+                }
+                
+                // Camera follows robot smoothly (ignoring vertical bounce)
+                const stablePos = robotGroup.position.clone();
+                stablePos.y -= Math.abs(Math.sin(walkTime)) * 0.3;
+                
+                const oldTarget = controls.target.clone();
+                controls.target.lerp(stablePos, 0.1);
+                const deltaTarget = new THREE.Vector3().subVectors(controls.target, oldTarget);
+                camera.position.add(deltaTarget);
+            }
+
+            // Farm Plots
+            plots.forEach(plot => {
+                if (plot.state === 'growing') {
+                    plot.progress += delta;
+                    
+                    if (plot.uiElement) {
+                        const screenPos = toScreenXY(plot.plantMesh.position, camera, renderer);
+                        plot.uiElement.container.style.left = screenPos.x + 'px';
+                        plot.uiElement.container.style.top = (screenPos.y - 40) + 'px';
+                        plot.uiElement.fill.style.width = Math.min((plot.progress / plot.maxTime * 100), 100) + '%';
+                    }
+                    
+                    const targetScale = 0.1 + (plot.progress / plot.maxTime) * 0.8 * PLANTS[plot.plantType].scale;
+                    plot.plantMesh.scale.set(targetScale, targetScale, targetScale);
+
+                    if (plot.progress >= plot.maxTime) {
+                        plot.state = 'ready';
+                        const s = PLANTS[plot.plantType].scale;
+                        plot.plantMesh.scale.set(s, s, s);
+                        plot.uiElement.container.remove();
+                        plot.uiElement = null;
+                        playSound('harvest'); // pop indicating ready
+                    }
+                } else if (plot.state === 'ready') {
+                    // Bobbing animation
+                    plot.plantMesh.position.y = plot.mesh.position.y + Math.sin(time * 5) * 0.1;
+                }
+            });
+            
+            // UI Overlays Update
+            floatingTexts.forEach((ft, i) => {
+                ft.life -= delta * 0.8;
+                ft.position.y += delta * 3;
+                if (ft.life <= 0) {
+                    ft.el.remove();
+                    floatingTexts.splice(i, 1);
+                } else {
+                    const screenPos = toScreenXY(ft.position, camera, renderer);
+                    ft.el.style.left = screenPos.x + 'px';
+                    ft.el.style.top = screenPos.y + 'px';
+                    ft.el.style.opacity = ft.life;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Particles Logic ---
+        function createWaterRain() {
+            for(let i=0; i<60; i++) {
+                const drop = new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({color: 0x3498db}));
+                drop.position.set(rand(-6, 6), rand(6, 12), rand(-2, 10));
+                scene.add(drop);
+                waterParticles.push({ mesh: drop, velocity: new THREE.Vector3(0, -rand(8, 15), 0) });
+            }
+        }
+
+        function emitSpark() {
+            const spark = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({color: Math.random()>0.5?0xffaa00:0xff3300}));
+            spark.position.copy(robotGroup.position);
+            spark.position.y += 1.5;
+            scene.add(spark);
+            sparkParticles.push({
+                mesh: spark,
+                velocity: new THREE.Vector3((Math.random()-0.5)*8, Math.random()*8, (Math.random()-0.5)*8),
+                life: 1.5
+            });
+        }
+
+        function updateParticles(delta) {
+            for (let i = waterParticles.length - 1; i >= 0; i--) {
+                let p = waterParticles[i];
+                p.mesh.position.addScaledVector(p.velocity, delta);
+                if (p.mesh.position.y < 1.5) {
+                    scene.remove(p.mesh);
+                    waterParticles.splice(i, 1);
+                }
+            }
+            for (let i = sparkParticles.length - 1; i >= 0; i--) {
+                let p = sparkParticles[i];
+                p.velocity.y -= 25 * delta; // strong gravity
+                p.mesh.position.addScaledVector(p.velocity, delta);
+                if (p.mesh.position.y < 1.5) {
+                    p.mesh.position.y = 1.5;
+                    p.velocity.y *= -0.5;
+                    p.velocity.x *= 0.8; p.velocity.z *= 0.8;
+                }
+                p.life -= delta;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    sparkParticles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- UI Logic ---
+        async function startGame() {
+            await Tone.start();
+            initAudio();
+            isGameStarted = true;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('ui-container').style.display = 'block';
+            updateUI();
+        }
+
+        function toggleShop() {
+            const shop = document.getElementById('shop-panel');
+            shop.style.display = (shop.style.display === 'none' || shop.style.display === '') ? 'block' : 'none';
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tab-seeds').classList.toggle('active', tab === 'seeds');
+            document.getElementById('tab-build').classList.toggle('active', tab === 'build');
+            document.getElementById('content-seeds').style.display = tab === 'seeds' ? 'block' : 'none';
+            document.getElementById('content-build').style.display = tab === 'build' ? 'block' : 'none';
+        }
+
+        function selectSeed(seed, el) {
+            currentSeed = seed;
+            document.querySelectorAll('.shop-item').forEach(item => item.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function updateUI() {
+            document.getElementById('coins-display').innerText = coins;
+            document.getElementById('inventory-display').innerText = `${inventoryCount} ชิ้น (${inventoryValue} 🪙)`;
+            document.getElementById('level-badge').innerText = `Lv.${playerLevel}`;
+            document.getElementById('exp-bar').style.width = `${Math.min(100, (playerExp / maxExp) * 100)}%`;
+            
+            const drops = document.querySelectorAll('.water-drop');
+            drops.forEach((drop, index) => {
+                if (index < waterDrops) drop.classList.add('active');
+                else drop.classList.remove('active');
+            });
+            
+            const expBtn = document.getElementById('btn-expand');
+            if (unlockedPlots >= 12) {
+                expBtn.innerText = "ขยายแปลงผัก (สูงสุดแล้ว)";
+                expBtn.disabled = true;
+            } else {
+                expBtn.innerText = `ขยายแปลงผัก (150 🪙)`;
+                expBtn.disabled = coins < 150;
+            }
+
+            const upgBtn = document.getElementById('btn-upgrade');
+            if (houseLevel === 1) {
+                upgBtn.innerText = `ต่อเติมบ้าน ระดับ 2 (300 🪙)`;
+                upgBtn.disabled = coins < 300;
+            } else if (houseLevel === 2) {
+                upgBtn.innerText = `ต่อเติมบ้าน ระดับ 3 (800 🪙)`;
+                upgBtn.disabled = coins < 800;
+            } else {
+                upgBtn.innerText = "บ้านระดับสูงสุดแล้ว";
+                upgBtn.disabled = true;
+            }
+        }
+
+        function sellAll() {
+            if (inventoryCount > 0) {
+                coins += inventoryValue;
+                playSound('sell');
+                showFloatingText(`+${inventoryValue} 🪙`, new THREE.Vector3(0, 5, 0), "#ffff00");
+                inventoryCount = 0;
+                inventoryValue = 0;
+                updateUI();
+            }
+        }
+
+        function expandPlot() {
+            if (coins >= 150 && unlockedPlots < 12) {
+                coins -= 150;
+                plots[unlockedPlots].isUnlocked = true;
+                plots[unlockedPlots].mesh.material = new THREE.MeshLambertMaterial({ color: 0x6e4b39 });
+                unlockedPlots++;
+                playSound('buff');
+                showFloatingText("-150 🪙", new THREE.Vector3(0, 5, 0), "#ff4444");
+                updateUI();
+            }
+        }
+
+        function upgradeHouse() {
+            let cost = houseLevel === 1 ? 300 : 800;
+            if (coins >= cost && houseLevel < 3) {
+                coins -= cost;
+                houseLevel++;
+                updateHouse();
+                playSound('buff');
+                showFloatingText(`-${cost} 🪙`, houseGroup.position, "#ff4444");
+                updateUI();
+            }
+        }
+
+        // --- Math Quiz Logic ---
+        let correctAnswer = 0;
+
+        function openQuizModal() {
+            document.getElementById('quiz-modal').style.display = 'block';
+            const ops = ['+', '-', '*'];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+            let a, b;
+            if (op === '+') { a = rand(10, 50); b = rand(10, 50); correctAnswer = a + b; }
+            if (op === '-') { a = rand(20, 50); b = rand(1, 19); correctAnswer = a - b; }
+            if (op === '*') { a = rand(2, 12); b = rand(2, 12); correctAnswer = a * b; }
+            
+            document.getElementById('quiz-question').innerText = `${a} ${op} ${b} = ?`;
+            
+            let options = [correctAnswer, correctAnswer + rand(1,5), correctAnswer - rand(1,5), correctAnswer + rand(6, 10)];
+            options.sort(() => Math.random() - 0.5);
+            
+            const container = document.getElementById('quiz-options');
+            container.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'interactive quiz-btn';
+                btn.innerText = opt;
+                btn.onclick = () => handleQuizAnswer(opt === correctAnswer);
+                container.appendChild(btn);
+            });
+        }
+
+        function handleQuizAnswer(isCorrect) {
+            document.getElementById('quiz-modal').style.display = 'none';
+            if (isCorrect) {
+                waterDrops = Math.min(maxWaterDrops, waterDrops + 2);
+                playSound('buff');
+                showFloatingText("ถูกต้อง! +2 💧", wellGroup.position, "#3498db");
+                updateUI();
+                createWaterRain();
+                
+                // Spin robot happily
+                let spin = 0;
+                const spinInterval = setInterval(() => {
+                    robotGroup.rotation.y += 0.2;
+                    spin += 0.2;
+                    if(spin > Math.PI * 4) clearInterval(spinInterval);
+                }, 16);
+            } else {
+                playSound('break');
+                showFloatingText("ผิด!", wellGroup.position, "#ff4444");
+                emitSpark();
+                robotGroup.rotation.y += (Math.random()-0.5)*0.5; // Quick shake
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true;
+        });
+
+        window.addEventListener('keyup', e => {
+            if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
+        });
+
+        // Auto-save on tab close / navigate away
+        window.addEventListener('beforeunload', () => {
+            saveGame(true);
+            sendLog('logout');
+        });
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>
