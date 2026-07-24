@@ -341,30 +341,21 @@
         // ============================================================
         // --- Google Sheets Auth & Cloud Save ---
         // ============================================================
-        // Helper: GET request to Apps Script.
-        // IMPORTANT: The Apps Script backend only implements doGet(e), which
-        // reads e.parameter (query string values). It has no doPost(e).
-        // Sending a POST with a JSON body therefore never gets handled and
-        // fails (shows up as "Failed to fetch" / CORS error in the browser).
-        // Using a plain GET with the payload encoded as query parameters:
-        //   1) matches what the backend actually expects (e.parameter), and
-        //   2) is a CORS "simple request" with no custom headers, so the
-        //      browser never sends a preflight OPTIONS request at all.
-        async function callAPI(payload) {
-            try {
-                const url = new URL(APP_SCRIPT_URL);
-                Object.keys(payload).forEach(key => {
-                    url.searchParams.set(key, payload[key]);
-                });
-                const res = await fetch(url.toString(), { method: 'GET' });
-                if (!res.ok) {
-                    throw new Error('HTTP ' + res.status);
-                }
-                return await res.json();
-            } catch (err) {
-                console.error('callAPI failed:', err);
-                throw err;
-            }
+        // ------------------------------------------------------------------
+        // LOCAL-ONLY AUTH (Google Apps Script backend disabled for now).
+        // Login/register no longer talk to any server. Instead, each
+        // username's save data lives in this browser's localStorage under
+        // the key `farmgame_save_<username>`. This means:
+        //   - No CORS / server issues, works instantly on GitHub Pages.
+        //   - Data is per-browser/per-device only (not shared across devices).
+        //   - Password is NOT verified against anything (any password works)
+        //     since there's no server to check it against.
+        // To re-enable the real Google Sheets backend later, restore the
+        // callAPI/handleAuth/sendLog/saveGame functions that call
+        // APP_SCRIPT_URL (see project history / previous version).
+        // ------------------------------------------------------------------
+        function localSaveKey(username) {
+            return 'farmgame_save_' + username.toLowerCase();
         }
 
         async function handleAuth(action) {
@@ -377,42 +368,32 @@
                 return;
             }
 
-            statusEl.style.color = '#3498db';
-            statusEl.textContent = action === 'login' ? 'กำลังเข้าสู่ระบบ...' : 'กำลังสมัคร...';
+            statusEl.style.color = '#2ecc71';
+            statusEl.textContent = action === 'login' ? 'เข้าสู่ระบบสำเร็จ!' : 'สมัครสำเร็จ!';
 
+            currentUsername = username;
+
+            // Try to load an existing local save for this username.
             try {
-                const data = await callAPI({ action, username, password });
-
-                if (data.status === 'ok') {
-                    currentUsername = username;
-                    statusEl.style.color = '#2ecc71';
-                    statusEl.textContent = action === 'login' ? 'เข้าสู่ระบบสำเร็จ!' : 'สมัครสำเร็จ!';
-                    if (data.gameState) {
-                        try { applyGameState(JSON.parse(data.gameState)); } catch(e) {}
-                    }
-                    setTimeout(() => {
-                        document.getElementById('auth-screen').style.display = 'none';
-                        document.getElementById('ui-container').style.display = 'block';
-                        document.getElementById('player-label').textContent = `👋 ${username}`;
-                        updateUI();
-                        if (!isGameStarted) startGame();
-                        sendLog(action === 'login' ? 'login' : 'register');
-                    }, 800);
-                } else {
-                    statusEl.style.color = '#e74c3c';
-                    statusEl.textContent = data.message || 'เกิดข้อผิดพลาด';
-                    console.log('Auth error:', data);
+                const raw = localStorage.getItem(localSaveKey(username));
+                if (raw) {
+                    applyGameState(JSON.parse(raw));
                 }
-            } catch(e) {
-                statusEl.style.color = '#e74c3c';
-                statusEl.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้ (' + (e && e.message ? e.message : 'unknown error') + ')';
-                console.error(e);
+            } catch (e) {
+                console.warn('No local save loaded:', e);
             }
+
+            setTimeout(() => {
+                document.getElementById('auth-screen').style.display = 'none';
+                document.getElementById('ui-container').style.display = 'block';
+                document.getElementById('player-label').textContent = `👋 ${username}`;
+                updateUI();
+                if (!isGameStarted) startGame();
+            }, 400);
         }
 
         function sendLog(action) {
-            if (!currentUsername) return;
-            callAPI({ action: 'log', username: currentUsername, logAction: action, timestamp: new Date().toISOString() }).catch(() => {});
+            // No-op: server logging disabled while backend is bypassed.
         }
 
         function saveGame(isAutoSave) {
@@ -422,11 +403,17 @@
                 unlockedIslandsCount, unlockedPlots, houseLevel, waterDrops,
                 plots: plots.map(p => ({ state: p.state, plantType: p.plantType, progress: p.progress, maxTime: p.maxTime, isUnlocked: p.isUnlocked }))
             };
-            callAPI({ action: 'save', username: currentUsername, gameState: JSON.stringify(gameState) }).then(() => {
+            try {
+                localStorage.setItem(localSaveKey(currentUsername), JSON.stringify(gameState));
                 if (!isAutoSave) {
                     showFloatingText('บันทึกเกมสำเร็จ! 💾', robotGroup ? robotGroup.position : new THREE.Vector3(0,2,0), '#3498db');
                 }
-            }).catch(() => {});
+            } catch (e) {
+                console.error('Local save failed:', e);
+                if (!isAutoSave) {
+                    showFloatingText('บันทึกล้มเหลว!', robotGroup ? robotGroup.position : new THREE.Vector3(0,2,0), '#ff4444');
+                }
+            }
         }
 
         function applyGameState(gs) {
